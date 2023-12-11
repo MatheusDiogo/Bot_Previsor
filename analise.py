@@ -24,11 +24,11 @@ mean_prices = grouped_data['price'].transform('mean')
 std_prices = grouped_data['price'].transform('std')
 
 # Normaliza os preços por SKU usando Z-Score
-#data['normalized price'] = (data['price'] - mean_prices) / std_prices
+data['normalized price'] = (data['price'] - mean_prices) / std_prices
 
 # Calcula o Z-Score para cada grupo
 def remove_outliers(group):
-    z_scores = zscore(group['price'])
+    z_scores = zscore(group['normalized price'])
     abs_z_scores = abs(z_scores)
     outliers = (abs_z_scores < 3)
     return group.loc[outliers]  # Use ~outliers para manter os não-outliers
@@ -43,7 +43,7 @@ plt.ylabel('Preço Normalizado (0-100)')
 plt.title('Preços Normalizados por SKU (Sem Outliers)')
 
 for sku, group in data_no_outliers.groupby('prodId'):
-    plt.plot(group['date'], group['price'].interpolate(), label=sku)
+    plt.plot(group['date'], group['normalized price'].interpolate(), label=sku)
 
 plt.legend()
 plt.show()
@@ -54,12 +54,12 @@ feriados_df = pd.DataFrame(list(feriados_brasil.items()), columns=['ds', 'holida
 
 with open('previsoes.txt', 'w') as file:
     for sku, group in data_no_outliers.groupby('prodId'):
-        prophet_data = group.rename(columns={'date': 'ds', 'price': 'y'})
+        prophet_data = group.rename(columns={'date': 'ds', 'normalized price': 'y'})
 
         # Interpolação dos dados faltantes
         prophet_data['y'] = prophet_data['y'].interpolate()
 
-        model = Prophet(mcmc_samples=300, holidays=feriados_df)
+        model = Prophet(interval_width=0.5, changepoint_prior_scale=0.1, holidays_prior_scale=8.0, seasonality_prior_scale=15.0, holidays=feriados_df)
 
         # Ajusta o modelo aos dados
         model.fit(prophet_data)
